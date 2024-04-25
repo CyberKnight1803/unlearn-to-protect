@@ -117,17 +117,68 @@ class ContrastivePairsDataset(Dataset):
 class ContrastiveDataModule(L.LightningDataModule):
     def __init__(
         self, 
-        batch_size: int = 64,
+        image_dir: str = Config.PATH_DATASET,
+        data_files: str = Config.RETAIN_DATA_FILES,
+        batch_size: int = Config.BATCH_SIZE,
+        device: str = Config.ACCELERATOR
     ) -> None:
         
         super(ContrastiveDataModule, self).__init__()
         self.save_hyperparameters(logger=True)
         
+        self.image_dir = image_dir
+        self.data_files = data_files
+        self.batch_size = batch_size
+        self.device = device
+        
+        self.transform = transforms.Compose([
+            transforms.ToTensor(), 
+            transforms.Grayscale()
+        ])
+        
     def setup(self, stage: Optional[str] = None) -> None:    
-        pass
+        self.retain_dataset = CARCDataset(
+            image_dir=self.image_dir,
+            data_file=self.data_files['retain'],
+            transform=self.transform,
+            device=self.device
+        )
+        
+        self.forget_dataset = CARCDataset(
+            image_dir=self.image_dir,
+            data_file=self.data_files['forget'],
+            transform=self.transform,
+            device=self.device
+        )
+        
+        self.train_dataset = ContrastivePairsDataset(
+            retain_dataset=self.retain_dataset,
+            forget_dataset=self.forget_dataset
+        )
+        
+        # Pairs are formed randomly => train pairs != test pairs
+        self.test_dataset = ContrastivePairsDataset(
+            retain_dataset=self.retain_dataset,
+            forget_dataset=self.forget_dataset
+        )
+        
     
     def train_dataloader(self) -> TRAIN_DATALOADERS:
-        pass
+        return DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
         
     def val_dataloader(self) -> EVAL_DATALOADERS:
-        pass
+        return DataLoader(
+            dataset=self.test_dataset,
+            batch_size=self.batch_size, 
+            shuffle=True
+        )
+    
+    def test_dataloader(self) -> EVAL_DATALOADERS:
+        return DataLoader(
+            dataset=self.test_dataset,
+            batch_size=self.batch_size,
+        )

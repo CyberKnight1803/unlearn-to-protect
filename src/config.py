@@ -18,5 +18,11 @@ class Config:
         'train': './celeb-data/train.csv',
         'test': './celeb-data/test.csv'
     }
+    
+    RETAIN_DATA_FILES = {
+        'retain': './celeb-data/retain.csv',
+        'forget': './celeb-data/forget.csv'
+    }
+    
     NUM_CLASSES = 5
     
