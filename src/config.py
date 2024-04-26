@@ -1,7 +1,7 @@
 class Config:
     GLOBAL_SEED = 42
     
-    MODEL_NAME = 'resnet-50'
+    MODEL_NAME = 'resnet-18'
     
     # HYPERPARAMS
     NUM_EPOCHS = 20
@@ -11,6 +11,7 @@ class Config:
     DROPOUT_RATE = 1e-3 
     ACCELERATOR = 'cuda'
     FEATURE_SIZE = 1024
+    TEMPERATURE = 0.1
     
     # Dataset 
     PATH_DATASET = "./CACD2000"
@@ -28,3 +29,5 @@ class Config:
     
     # Contrastive 
     DEFAULT_FEATURE_EXTRACTOR_WEIGHTS = "./checkpoints/feature_extractor/resnet-18-r18-b64.pt"
+    DEFAULT_CLASSIFIER_WEIGHTS = "./checkpoints/classifier/resnet-18-r18-b64.pt"
+    

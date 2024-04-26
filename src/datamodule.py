@@ -107,34 +107,20 @@ class CARCDataModule(L.LightningDataModule):
 
 
 class ContrastivePairsDataset(Dataset):
-    def __init__(self, retain_dataset, forget_dataset, labels_to_samples):
+    def __init__(self, retain_dataset, forget_dataset):
         self.retain_dataset = retain_dataset
         self.forget_dataset = forget_dataset 
-        self.label_to_samples = labels_to_samples
         
     def __len__(self):
         return len(self.forget_dataset)
     
     def __getitem__(self, idx):
-        # Anchor
-        name_f, img_f, label_f = self.forget_dataset[idx]
+        names_f, imgs_f, labels_f = self.forget_dataset[idx]
         
-        # Positive sample 
-        positive_indices = self.label_to_samples[label_f.item()]
-        pos_index = np.random.choice(positive_indices)
-        name_r_pos, img_r_pos, label_r_pos = self.retain_dataset[pos_index]
-        
-        # Negative sample
-        negative_labels = list(self.label_to_samples.keys())
-        if label_f.item() in negative_labels:
-            negative_labels.remove(label_f.item())
-        
-        neg_label = np.random.choice(negative_labels)
-        neg_index = np.random.choice(self.label_to_samples[neg_label])
-        name_r_neg, img_r_neg, label_r_neg = self.retain_dataset[neg_index]
-        
-        return name_f, img_f, label_f, name_r_pos, img_r_pos, label_r_pos, name_r_neg, img_r_neg, label_r_neg
+        r_idx = np.random.randint(0, len(self.retain_dataset))
+        names_r, imgs_r, labels_r = self.retain_dataset[r_idx]
 
+        return names_f, imgs_f, labels_f, names_r, imgs_r, labels_r
 class ContrastiveDataModule(L.LightningDataModule):
     def __init__(
         self, 
@@ -157,13 +143,7 @@ class ContrastiveDataModule(L.LightningDataModule):
             transforms.Grayscale()
         ])
          
-        self.label_to_samples = {}
-        retain_df = pd.read_csv(data_files['retain'])
-        for idx, label in enumerate(retain_df['age_bin']):
-            if label not in self.label_to_samples:
-                self.label_to_samples[label] = []
-            self.label_to_samples[label].append(idx)
-        
+    
     def setup(self, stage: Optional[str] = None) -> None:
         self.retain_dataset = CARCDataset(
             image_dir=self.image_dir,
@@ -182,17 +162,14 @@ class ContrastiveDataModule(L.LightningDataModule):
         self.train_dataset = ContrastivePairsDataset(
             retain_dataset=self.retain_dataset,
             forget_dataset=self.forget_dataset, 
-            labels_to_samples=self.label_to_samples
         )
         
         # Pairs are formed randomly => train pairs != test pairs
         self.test_dataset = ContrastivePairsDataset(
             retain_dataset=self.retain_dataset,
             forget_dataset=self.forget_dataset, 
-            labels_to_samples=self.label_to_samples
         )
         
-    
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         return DataLoader(
             dataset=self.train_dataset,

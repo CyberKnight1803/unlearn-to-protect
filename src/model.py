@@ -1,3 +1,4 @@
+from typing import List, Dict 
 import torch
 import torch.nn as nn 
 import torch.nn.functional as F 
@@ -9,6 +10,7 @@ from lightning.pytorch.utilities.types import STEP_OUTPUT
 from torchmetrics.functional import accuracy, f1_score
 import transformers as T
 
+from src.loss import ContrastiveUnlearnLoss
 from src.config import Config
 
 
@@ -213,7 +215,6 @@ class VisionTransformer(L.LightningModule):
         }
         
         
-
     def validation_step(self, batch, batch_idx):
         imgs, labels = batch 
         out = self(imgs, labels)
@@ -267,35 +268,112 @@ class VisionTransformer(L.LightningModule):
 class ContrastiveLearning(L.LightningModule):
     def __init__(
         self,
-        feature_extractor_path: str,
+        feature_extractor_path: str = Config.DEFAULT_FEATURE_EXTRACTOR_WEIGHTS,
+        classifier_path: str = Config.DEFAULT_CLASSIFIER_WEIGHTS,
         model_name: str = Config.MODEL_NAME, 
         feature_size: int = Config.FEATURE_SIZE,
         num_classes: int = Config.NUM_CLASSES,
         learning_rate: float = Config.LEARNING_RATE,
-        weight_decay: float = Config.WEIGHT_DECAY
+        weight_decay: float = Config.WEIGHT_DECAY, 
+        temperature: float = Config.TEMPERATURE
     ) -> None:
         
         super(ContrastiveLearning, self).__init__()
         self.save_hyperparameters(logger=True)
         
-        self.feature_extractor = FeatureExtractor(model_name, feature_size)
-        self.feature_extractor.load_state_dict(torch.load(feature_extractor_path))
+        self.feature_extractor = torch.load(feature_extractor_path)
+        self.classifier = torch.load(classifier_path)
         
+        self.contrastive_loss_fn = ContrastiveUnlearnLoss(temperature=temperature)
+        self.cross_entropy_loss_fn = nn.CrossEntropyLoss()
         
-    def forward(self, *args: torch.Any, **kwargs: torch.Any) -> torch.Any:
-        pass
+    def forward(self, x_f, x_r) -> List[torch.Tensor]:
+        h_f = self.feature_extractor(x_f)
+        h_r = self.feature_extractor(x_r)
+        out_r = self.classifier(h_r)
+        return h_f, h_r, out_r
     
     def training_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        pass
-    
+        # forget, retain
+        names_f, imgs_f, labels_f, names_r, imgs_r, labels_r = batch
+        
+        # Forward 
+        h_f, h_r, out_r = self(imgs_f, imgs_r)   
+        loss = 0.6 * self.contrastive_loss_fn(h_f, labels_f, h_r, labels_r) + 0.4 * self.cross_entropy_loss_fn(out_r, labels_r)
+        acc = accuracy(out_r, labels_r, num_classes=self.hparams.num_classes, task='multiclass')
+        f1 = f1_score(out_r, labels_r, num_classes=self.hparams.num_classes, task='multiclass', average='macro')
+        
+        self.log_dict({
+            'loss/train': loss,
+            'acc/train': acc,
+            'f1/train': f1
+        })
+        
+        return {
+            'loss': loss, 
+            'acc': acc,
+            'f1': f1
+        } 
+        
     def validation_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        pass
+        # forget, retain
+        names_f, imgs_f, labels_f, names_r, imgs_r, labels_r = batch
+        
+        # Forward 
+        h_f, h_r, out_r = self(imgs_f, imgs_r)   
+        loss = 0.6 * self.contrastive_loss_fn(h_f, labels_f, h_r, labels_r) + 0.4 * self.cross_entropy_loss_fn(out_r, labels_r)
+        acc = accuracy(out_r, labels_r, num_classes=self.hparams.num_classes, task='multiclass')
+        f1 = f1_score(out_r, labels_r, num_classes=self.hparams.num_classes, task='multiclass', average='macro')
+        
+        self.log_dict({
+            'loss/val': loss,
+            'acc/val': acc,
+            'f1/val': f1
+        })
+        
+        return {
+            'loss': loss, 
+            'acc': acc,
+            'f1': f1
+        } 
+        
     
     def test_step(self, batch, batch_idx) -> STEP_OUTPUT:
-        pass
+        # forget, retain
+        names_f, imgs_f, labels_f, names_r, imgs_r, labels_r = batch
+        
+        # Forward 
+        h_f, h_r, out_r = self(imgs_f, imgs_r)   
+        loss = 0.6 * self.contrastive_loss_fn(h_f, labels_f, h_r, labels_r) + 0.4 * self.cross_entropy_loss_fn(out_r, labels_r)
+        acc = accuracy(out_r, labels_r, num_classes=self.hparams.num_classes, task='multiclass')
+        f1 = f1_score(out_r, labels_r, num_classes=self.hparams.num_classes, task='multiclass', average='macro')
+        
+        self.log_dict({
+            'loss/test': loss,
+            'acc/test': acc,
+            'f1/test': f1
+        })
+        
+        return {
+            'loss': loss, 
+            'acc': acc,
+            'f1': f1
+        } 
+        
     
     def configure_optimizers(self):
-        pass
+        optimizer = torch.optim.AdamW(
+            params=self.parameters(),
+            lr=self.hparams.learning_rate,
+            weight_decay=self.hparams.weight_decay    
+        )
+    
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer=optimizer,
+            T_0=1000
+        )
+        
+        return [optimizer], [lr_scheduler]
     
         
         
