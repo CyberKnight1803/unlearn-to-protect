@@ -15,7 +15,7 @@ class Config:
     # Dataset 
     PATH_DATASET = "./CACD2000"
     DATA_FILES = {
-        'train': './celeb-data/train.csv',
+        'train': './celeb-data/retain.csv',
         'test': './celeb-data/test.csv'
     }
     
@@ -26,3 +26,5 @@ class Config:
     
     NUM_CLASSES = 5
     
+    # Contrastive 
+    DEFAULT_FEATURE_EXTRACTOR_WEIGHTS = "./checkpoints/feature_extractor/resnet-18-r18-b64.pt"

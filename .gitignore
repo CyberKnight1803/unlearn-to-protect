@@ -1,7 +1,6 @@
 base_models/
 CACD2000/
 celeb-data/
-checkpoints/
 data/
 logs/
 og_checkpoints/

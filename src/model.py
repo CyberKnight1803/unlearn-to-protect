@@ -170,7 +170,7 @@ class Model(L.LightningModule):
     
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
             optimizer=optimizer,
-            T_0=50
+            T_0=1000
         )
         
         return [optimizer], [lr_scheduler]
@@ -267,13 +267,12 @@ class VisionTransformer(L.LightningModule):
 class ContrastiveLearning(L.LightningModule):
     def __init__(
         self,
-        model_name: str = 'resnet-18', 
-        feature_size: int = 1024,
-        num_classes: int = 8,
-        feature_extractor_path: str = None,
-        classifier_path: str = None,
-        learning_rate: float = 1e-3,
-        weight_decay: float = 1e-4
+        feature_extractor_path: str,
+        model_name: str = Config.MODEL_NAME, 
+        feature_size: int = Config.FEATURE_SIZE,
+        num_classes: int = Config.NUM_CLASSES,
+        learning_rate: float = Config.LEARNING_RATE,
+        weight_decay: float = Config.WEIGHT_DECAY
     ) -> None:
         
         super(ContrastiveLearning, self).__init__()
@@ -281,10 +280,6 @@ class ContrastiveLearning(L.LightningModule):
         
         self.feature_extractor = FeatureExtractor(model_name, feature_size)
         self.feature_extractor.load_state_dict(torch.load(feature_extractor_path))
-        
-        self.classifier = MLPLayer(feature_size, num_classes)
-        self.classifier.load_state_dict(torch.load(classifier_path))
-        
         
         
     def forward(self, *args: torch.Any, **kwargs: torch.Any) -> torch.Any:
