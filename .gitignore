@@ -4,7 +4,7 @@ celeb-data/
 data/
 logs/
 og_checkpoints/
-
+checkpoints/
 **/__pycache__
 **/.DS_Store
 exp.ipynb
